@@ -26,7 +26,8 @@ export default {
       fontFamily: {
         bebas: ['"Bebas Neue"', 'sans-serif'],
         anton: ['Anton', 'sans-serif'],
-        serif: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+        instrument: ['"Instrument Serif"', '"Cormorant Garamond"', 'Georgia', 'serif'],
+        serif: ['"Instrument Serif"', '"Cormorant Garamond"', 'Georgia', 'serif'],
         italiana: ['Italiana', 'serif'],
         display: ['Syne', 'sans-serif'],
         sans: ['"Plus Jakarta Sans"', 'sans-serif'],

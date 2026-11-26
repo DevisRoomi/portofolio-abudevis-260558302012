@@ -8,11 +8,15 @@ interface HeroSectionProps {
   isLoading?: boolean;
 }
 
-export const HeroSection: React.FC<HeroSectionProps> = () => {
+export const HeroSection: React.FC<HeroSectionProps> = ({ isLoading = false }) => {
   const heroRef = useRef<HTMLElement>(null);
   const portraitRef = useRef<HTMLDivElement>(null);
+  const portraitEnterRef = useRef<HTMLDivElement>(null);
+  const marqueeWrapRef = useRef<HTMLDivElement>(null);
+  const bottomBarRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const singleSpanRef = useRef<HTMLSpanElement>(null);
+  const hasPlayedEntranceRef = useRef<boolean>(false);
 
   // Marquee velocity state
   const offsetRef = useRef<number>(0);
@@ -27,13 +31,18 @@ export const HeroSection: React.FC<HeroSectionProps> = () => {
       ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
       : false;
 
-  // Kinetic Interactive Marquee Animation Loop
+  // Kinetic Interactive Marquee Animation Loop (Auto-stops 100% when Hero scrolls off-screen!)
   useEffect(() => {
-    if (prefersReducedMotion) return;
+    if (prefersReducedMotion || !heroRef.current) return;
 
-    let animId: number;
+    let animId = 0;
+    let isVisible = true;
 
     const tick = () => {
+      if (!isVisible) {
+        animId = 0;
+        return;
+      }
       if (trackRef.current && singleSpanRef.current) {
         const singleWidth = singleSpanRef.current.offsetWidth || 1200;
 
@@ -50,13 +59,36 @@ export const HeroSection: React.FC<HeroSectionProps> = () => {
           offsetRef.current -= singleWidth;
         }
 
-        trackRef.current.style.transform = `translate3d(${offsetRef.current}px, 0, 0)`;
+        trackRef.current.style.transform = `translate3d(${offsetRef.current.toFixed(2)}px, 0, 0)`;
       }
       animId = requestAnimationFrame(tick);
     };
 
-    animId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animId);
+    const startLoop = () => {
+      if (!animId && isVisible) {
+        animId = requestAnimationFrame(tick);
+      }
+    };
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        isVisible = entries[0]?.isIntersecting ?? false;
+        if (isVisible) {
+          startLoop();
+        } else if (animId) {
+          cancelAnimationFrame(animId);
+          animId = 0;
+        }
+      },
+      { threshold: 0.01 }
+    );
+    io.observe(heroRef.current);
+
+    startLoop();
+    return () => {
+      io.disconnect();
+      if (animId) cancelAnimationFrame(animId);
+    };
   }, [prefersReducedMotion]);
 
   // Mouse Move Interaction: Parallax on portrait + dynamic marquee steering
@@ -126,6 +158,67 @@ export const HeroSection: React.FC<HeroSectionProps> = () => {
     targetSpeedRef.current = -1.6;
   };
 
+  // Post-Preloader Opening Choreography (100% Solid Rise — ZERO translucent ghosting over marquee!)
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+
+    if (isLoading) {
+      // Prime opening states cleanly below horizon on matching Cobalt Sky while Preloader covers viewport
+      if (portraitEnterRef.current) {
+        gsap.set(portraitEnterRef.current, { yPercent: 102, scale: 1.03, opacity: 1 });
+      }
+      if (marqueeWrapRef.current) {
+        gsap.set(marqueeWrapRef.current, { opacity: 0, y: 24 });
+      }
+      if (bottomBarRef.current) {
+        gsap.set(bottomBarRef.current, { opacity: 0, y: 16 });
+      }
+      return;
+    }
+
+    if (hasPlayedEntranceRef.current) return;
+    hasPlayedEntranceRef.current = true;
+
+    // Velocity surge on marquee that naturally decays to smooth drift via RAF lerp
+    currentSpeedRef.current = -8.5;
+
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+    // 1. Devis rises 100% SOLID opaque from the bottom horizon (no marquee bleed-through on face!)
+    if (portraitEnterRef.current) {
+      tl.fromTo(
+        portraitEnterRef.current,
+        { yPercent: 102, scale: 1.03, opacity: 1 },
+        { yPercent: 0, scale: 1, opacity: 1, duration: 0.98, ease: 'expo.out', clearProps: 'transform' },
+        0
+      );
+    }
+
+    // 2. Editorial marquee glides in crisply BEHIND Devis's solid shoulders once he enters frame
+    if (marqueeWrapRef.current) {
+      tl.fromTo(
+        marqueeWrapRef.current,
+        { opacity: 0, y: 24 },
+        { opacity: 1, y: 0, duration: 0.82, ease: 'power3.out', clearProps: 'transform' },
+        0.18
+      );
+    }
+
+    // 3. Bottom horizon metadata settles softly
+    if (bottomBarRef.current) {
+      tl.fromTo(
+        bottomBarRef.current,
+        { opacity: 0, y: 16 },
+        { opacity: 1, y: 0, duration: 0.72, clearProps: 'transform' },
+        0.38
+      );
+    }
+
+    return () => {
+      tl.kill();
+    };
+  }, [isLoading, prefersReducedMotion]);
+
   // Stacking Sections with Scale-Down Parallax (Scrubbed smoothly via GSAP ScrollTrigger)
   useEffect(() => {
     if (prefersReducedMotion || !heroRef.current) return;
@@ -161,6 +254,21 @@ export const HeroSection: React.FC<HeroSectionProps> = () => {
           },
         }
       );
+
+      // Smooth parallax sink on Devis's portrait as Section 2 curved horizon rises
+      if (portraitRef.current) {
+        gsap.to(portraitRef.current, {
+          y: 110,
+          opacity: 0.88,
+          ease: 'none',
+          scrollTrigger: {
+            trigger: heroRef.current,
+            start: 'top top',
+            end: 'bottom top',
+            scrub: true,
+          },
+        });
+      }
     }, heroRef);
 
     return () => ctx.revert();
@@ -172,7 +280,7 @@ export const HeroSection: React.FC<HeroSectionProps> = () => {
       ref={heroRef}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className="sticky top-0 z-10 h-screen max-h-screen w-full flex flex-col justify-between pt-24 pb-8 px-6 sm:px-12 md:px-16 overflow-hidden select-none origin-top will-change-transform"
+      className="sticky top-0 z-10 h-screen max-h-screen w-full flex flex-col justify-between pt-24 pb-6 sm:pb-8 px-4 sm:px-12 md:px-16 overflow-hidden select-none origin-top will-change-transform"
       style={{
         background:
           'radial-gradient(ellipse at 50% 44%, #7DD3FC 0%, #38BDF8 26%, #2563EB 58%, #1D4ED8 80%, #1538A6 100%)',
@@ -181,12 +289,16 @@ export const HeroSection: React.FC<HeroSectionProps> = () => {
       {/* 1. Subtle Organic Film Grain Overlay */}
       <div className="film-grain-overlay" />
 
-      {/* 2. Solusi 2: Balanced Ambient Lighting (Tidak bocor ke area navbar) */}
+      {/* 2. Solusi 2: Balanced Ambient Lighting (Pure radial-gradient — zero heavy GPU blur-[140px] offscreen surfaces!) */}
       <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
         {/* Soft volumetric halo centered behind torso & shoulders */}
-        <div className="absolute top-[44%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[520px] bg-white/30 rounded-full blur-[130px]" />
-        <div className="absolute -top-24 -left-24 w-[420px] h-[420px] bg-blue-700/30 rounded-full blur-[130px]" />
-        <div className="absolute -bottom-28 -right-28 w-[640px] h-[640px] bg-blue-900/40 rounded-full blur-[140px]" />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(460px 340px at 50% 44%, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0) 72%), radial-gradient(380px 380px at 0% 0%, rgba(29,78,216,0.32) 0%, rgba(29,78,216,0) 72%), radial-gradient(520px 520px at 100% 100%, rgba(30,58,138,0.42) 0%, rgba(30,58,138,0) 72%)',
+          }}
+        />
 
         {/* Blueprint hairline grid */}
         <div
@@ -202,14 +314,20 @@ export const HeroSection: React.FC<HeroSectionProps> = () => {
       {/* Spacer to push content naturally */}
       <div className="w-full flex-1" />
 
+      {/* Semantic H1 for SEO & Accessibility without altering visual marquee */}
+      <h1 className="sr-only">
+        Abu Devis Jalaluddin Rumi — Software Engineering Student & Creative Web Developer
+      </h1>
+
       {/* 
         3. Sandwich Layer 1 (Back): Tall, Condensed Editorial Marquee (Level Bahu & Leher)
         Ref: Drama Owns aesthetic.
       */}
       <div
+        ref={marqueeWrapRef}
         onMouseEnter={handleTextMouseEnter}
         onMouseLeave={handleTextMouseLeave}
-        className="absolute bottom-[28%] sm:bottom-[30%] md:bottom-[32%] lg:bottom-[34%] left-0 w-full overflow-hidden select-none z-10 cursor-pointer py-4"
+        className="absolute bottom-[28%] sm:bottom-[30%] md:bottom-[32%] lg:bottom-[34%] left-0 w-full overflow-hidden select-none z-10 cursor-pointer py-4 will-change-transform"
       >
         <div
           ref={trackRef}
@@ -246,22 +364,32 @@ export const HeroSection: React.FC<HeroSectionProps> = () => {
           className="relative -translate-x-2 sm:-translate-x-3 h-[76vh] sm:h-[80vh] md:h-[82vh] lg:h-[84vh] max-h-[860px] flex items-end justify-center pointer-events-none will-change-transform"
           style={{ transform: 'translate3d(0, 0, 0)' }}
         >
-          <picture className="h-full w-auto max-w-full block">
-            <source srcSet="/assets/devis_portrait_polished.webp" type="image/webp" />
-            <img
-              src="/assets/devis_portrait_polished.png"
-              alt="Abu Devis Jalaluddin Rumi"
-              className="h-full w-auto max-w-full object-contain object-bottom select-none filter contrast-[1.03] brightness-[1.01] drop-shadow-[0_32px_60px_rgba(15,23,42,0.4)]"
-              loading="eager"
-            />
-          </picture>
+          <div ref={portraitEnterRef} className="h-full w-auto flex items-end justify-center will-change-transform">
+            <picture className="h-full w-auto max-w-full block">
+              <source srcSet="/assets/devis_portrait_polished.webp" type="image/webp" />
+              <img
+                src="/assets/devis_portrait_polished.webp"
+                alt="Abu Devis Jalaluddin Rumi"
+                width="720"
+                height="860"
+                className="h-full w-auto max-w-full object-contain object-bottom select-none filter contrast-[1.03] brightness-[1.01] drop-shadow-[0_32px_60px_rgba(15,23,42,0.4)]"
+                loading="eager"
+                decoding="sync"
+                // @ts-ignore
+                fetchpriority="high"
+              />
+            </picture>
+          </div>
         </div>
       </div>
 
       {/* 
         5. Clean Minimalist Bottom Horizon (Ref: Drama Owns)
       */}
-      <div className="w-full z-30 flex items-center justify-between text-white/90 text-xs sm:text-sm font-mono tracking-wider pointer-events-none">
+      <div
+        ref={bottomBarRef}
+        className="w-full z-30 flex items-center justify-between text-white/90 text-xs sm:text-sm font-mono tracking-wider pointer-events-none"
+      >
         {/* Left: Clean Tagline */}
         <div className="flex items-center gap-2 pointer-events-auto">
           <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_#ffffff]" />

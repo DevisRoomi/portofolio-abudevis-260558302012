@@ -13,3 +13,9 @@ dist-ssr
 *.sw?
 scratch/
 *.log
+
+# Local build cache, scratch captures, and archived unused raw assets (never push to GitHub/Vercel)
+tsconfig.tsbuildinfo
+_archive_unused_assets/
+blog_code_assets/
+blog_screenshots/

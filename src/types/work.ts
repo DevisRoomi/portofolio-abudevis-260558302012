@@ -11,6 +11,8 @@ export interface Project {
   subtitle: string;
   description: string; // Exactly 1 specific sentence about function & value
   longDesc: string;
+  highlights?: string[];
+  year?: string;
   tags: string[];
   githubUrl: string;
   images: ProjectImage[];
@@ -19,6 +21,7 @@ export interface Project {
   bevelColor: string;  // 3D physical edge bevel extrusion
   accentBg: string;    // Chip background
   accentFg: string;    // Chip text
+  stageBg: string;     // Subtle chromatic pastel studio canvas tint
   dark: boolean;       // Dark card flag
 }
 
@@ -30,6 +33,8 @@ export interface SlotConfig {
   h: number;
   z: number;
   opacity: number;
+  scale?: number;
+  depthZ?: number;
 }
 
 export interface FooterCategory {
